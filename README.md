@@ -1,4 +1,5 @@
 # SC CGF Converter
+Created using OpenAI.
 
 A Windows desktop utility for converting extracted Star Citizen assets with an external CryEngine converter. It provides recursive folder batches, preserved output structure, named export presets, tooltips and in-app Help. An optional native animation processor decodes supported DBA tracks using an exported CGF skeleton's original coordinate convention.
 
