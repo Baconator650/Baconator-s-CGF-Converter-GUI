@@ -1,0 +1,7 @@
+{
+  "id": "SC_Static_USDA",
+  "name": "SC - Static / Geometry USDA",
+  "profiles": ["StarCitizen"],
+  "converter_args": ["-usda", "-ut", "-loglevel", "info"],
+  "description": "Stock converter path. No animation inclusion."
+}

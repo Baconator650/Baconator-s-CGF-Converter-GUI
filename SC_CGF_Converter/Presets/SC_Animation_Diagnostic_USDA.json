@@ -1,0 +1,15 @@
+{
+  "id": "SC_Animation_Diagnostic_USDA",
+  "name": "SC - Animation Diagnostic USDA",
+  "profiles": [
+    "StarCitizen"
+  ],
+  "converter_args": [
+    "-usda",
+    "-anim",
+    "-notex",
+    "-loglevel",
+    "debug"
+  ],
+  "description": "Animation-focused Star Citizen diagnostic conversion. Disables texture export/noise so DBA/CAF/skeleton diagnostics are easier to inspect."
+}

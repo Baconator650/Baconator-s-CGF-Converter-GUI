@@ -1,0 +1,6 @@
+{
+  "id": "Generic_USDA",
+  "name": "Generic - USDA",
+  "profiles": ["Generic_CryEngine", "MechWarriorOnline", "Crysis"],
+  "converter_args": ["-usda", "-loglevel", "info"]
+}

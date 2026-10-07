@@ -1,0 +1,16 @@
+{
+  "id": "SC_3dsMax_DAE",
+  "name": "DAE (legacy)",
+  "profiles": [
+    "StarCitizen"
+  ],
+  "converter_args": [
+    "-dae",
+    "-anim",
+    "-ut",
+    "-loglevel",
+    "info"
+  ],
+  "description": "DAE-oriented Star Citizen workflow for 3ds Max testing.",
+  "display_name": "DAE (legacy)"
+}

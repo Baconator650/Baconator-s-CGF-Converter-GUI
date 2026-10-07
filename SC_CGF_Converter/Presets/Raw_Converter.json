@@ -1,0 +1,7 @@
+{
+  "id": "Raw_Converter",
+  "name": "Raw Converter - no preset flags",
+  "profiles": ["*"],
+  "converter_args": [],
+  "description": "Only input, objectdir, outdir and manually entered Extra args are added."
+}

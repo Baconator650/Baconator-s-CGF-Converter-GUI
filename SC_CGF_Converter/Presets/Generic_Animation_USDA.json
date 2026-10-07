@@ -1,0 +1,6 @@
+{
+  "id": "Generic_Animation_USDA",
+  "name": "Generic - USDA + Animations",
+  "profiles": ["Generic_CryEngine", "MechWarriorOnline", "Crysis"],
+  "converter_args": ["-usda", "-anim", "-loglevel", "info"]
+}

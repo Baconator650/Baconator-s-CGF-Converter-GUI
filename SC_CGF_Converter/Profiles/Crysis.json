@@ -1,0 +1,11 @@
+{
+  "id": "Crysis",
+  "name": "Crysis",
+  "status": "profile-shell",
+  "source_space": "CryEngine",
+  "reference_space": "Converter output",
+  "supported_extensions": [".cgf", ".cga", ".chr", ".skin"],
+  "dependency_extensions": [".chrparams", ".caf", ".dba", ".cal", ".mtl"],
+  "coordinate_rules": {},
+  "notes": "Profile intentionally external so game-specific behavior can change without rebuilding the GUI."
+}

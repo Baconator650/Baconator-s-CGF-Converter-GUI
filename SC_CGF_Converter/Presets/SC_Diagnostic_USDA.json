@@ -1,0 +1,7 @@
+{
+  "id": "SC_Diagnostic_USDA",
+  "name": "SC - Diagnostic USDA",
+  "profiles": ["StarCitizen"],
+  "converter_args": ["-usda", "-anim", "-ut", "-loglevel", "debug"],
+  "description": "Verbose stock conversion for processor comparison."
+}

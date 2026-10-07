@@ -1,0 +1,21 @@
+{
+  "id": "SC_Animated_Files",
+  "name": "Animated Files (.cga, .skin, .chr)",
+  "display_name": "Animated Files (.cga, .skin, .chr)",
+  "profiles": [
+    "StarCitizen"
+  ],
+  "input_extensions": [
+    ".cga",
+    ".skin",
+    ".chr"
+  ],
+  "per_asset_animation": true,
+  "converter_args": [
+    "-usda",
+    "-ut",
+    "-loglevel",
+    "info"
+  ],
+  "description": "USDA export filtered to .cga, .skin, .chr. CHR/CGA request stock animation. Existing converter limitations still apply."
+}

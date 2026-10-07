@@ -1,0 +1,11 @@
+{
+  "id": "Generic_CryEngine",
+  "name": "Generic CryEngine",
+  "status": "stable-base",
+  "source_space": "CryEngine",
+  "reference_space": "Converter output",
+  "supported_extensions": [".cgf", ".cga", ".chr", ".skin", ".anim", ".dba"],
+  "dependency_extensions": [".chrparams", ".caf", ".dba", ".cal", ".mtl"],
+  "coordinate_rules": {},
+  "asset_family_priority": ["metadata", "same_basename", "same_folder"]
+}

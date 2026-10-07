@@ -1,0 +1,15 @@
+{
+  "id": "SC_Normal_Batch_USDA",
+  "name": "SC - Normal Batch USDA",
+  "profiles": [
+    "StarCitizen"
+  ],
+  "converter_args": [
+    "-usda",
+    "-ut",
+    "-loglevel",
+    "info"
+  ],
+  "per_asset_animation": true,
+  "description": "Normal geometry batch. CHR/CGA include stock animation; SKIN/CGF do not request animation."
+}

@@ -1,0 +1,11 @@
+{
+  "id": "MechWarriorOnline",
+  "name": "MechWarrior Online",
+  "status": "profile-shell",
+  "source_space": "CryEngine",
+  "reference_space": "Converter output",
+  "supported_extensions": [".cgf", ".cga", ".chr", ".skin"],
+  "dependency_extensions": [".chrparams", ".caf", ".dba", ".cal", ".mtl"],
+  "coordinate_rules": {},
+  "notes": "Profile intentionally data-driven. Add MWO-specific rules here without recompiling the host."
+}

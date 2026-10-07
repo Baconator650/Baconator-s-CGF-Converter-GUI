@@ -1,0 +1,20 @@
+{
+  "id": "SC_CHR_SKIN_Animation_USDA",
+  "name": "SC - CHR/SKIN + Animation USDA",
+  "profiles": [
+    "StarCitizen"
+  ],
+  "converter_args": [
+    "-usda",
+    "-anim",
+    "-ut",
+    "-loglevel",
+    "info"
+  ],
+  "description": "Normal Star Citizen skeletal conversion with stock -anim behavior.",
+  "display_name": ".skin/chr (landing gear, armor, weapons)",
+  "input_extensions": [
+    ".skin",
+    ".chr"
+  ]
+}

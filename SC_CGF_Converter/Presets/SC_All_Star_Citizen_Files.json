@@ -1,0 +1,24 @@
+{
+  "id": "SC_All_Star_Citizen_Files",
+  "name": "All Star Citizen Files",
+  "display_name": "All Star Citizen Files",
+  "profiles": [
+    "StarCitizen"
+  ],
+  "input_extensions": [
+    ".cgf",
+    ".cga",
+    ".skin",
+    ".chr",
+    ".anim",
+    ".dba"
+  ],
+  "per_asset_animation": true,
+  "converter_args": [
+    "-usda",
+    "-ut",
+    "-loglevel",
+    "info"
+  ],
+  "description": "USDA export filtered to .cgf, .cga, .skin, .chr, .anim, .dba. CHR/CGA request stock animation. Existing converter limitations still apply."
+}

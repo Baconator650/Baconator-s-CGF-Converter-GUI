@@ -1,0 +1,29 @@
+{
+  "id": "StarCitizen",
+  "name": "Star Citizen / CIG",
+  "status": "development",
+  "source_space": "CIG",
+  "reference_space": "LegacyHTR",
+  "supported_extensions": [
+    ".cgf",
+    ".cga",
+    ".chr",
+    ".skin",
+    ".anim",
+    ".dba"
+  ],
+  "dependency_extensions": [
+    ".cdf",
+    ".chrparams",
+    ".skinm",
+    ".animevents",
+    ".caf",
+    ".dba"
+  ],
+  "asset_family_priority": [
+    "cdf_binding",
+    "chrparams",
+    "same_basename",
+    "same_folder"
+  ]
+}
