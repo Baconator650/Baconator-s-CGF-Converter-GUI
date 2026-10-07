@@ -1,1 +1,0 @@
-Windows GUI for Star Citizen asset conversion: recursive batch export, preserved folder structure, named USDA/legacy DAE presets, and an optional decoded DBA animation exporter. Requires an external CryEngine converter.
