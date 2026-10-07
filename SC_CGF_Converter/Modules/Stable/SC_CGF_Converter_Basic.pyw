@@ -11,7 +11,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-TITLE = 'SC CGF Converter — Basic 1.0'
+TITLE = 'SC CGF Converter — Basic 1.1'
 ROOT = Path(__file__).resolve().parent
 FORMATS = {'USDA': '-usd', 'DAE (legacy)': '-dae', 'GLTF': '-gltf', 'GLB': '-glb'}
 FILTERS = {
@@ -28,7 +28,7 @@ HELP = '''BASIC EXPORT
 5. For normal exports leave Format = USDA, Animations off, and Workers = 2.
 6. Click EXPORT.
 
-Folder batches use one converter process with two parallel workers. Include subfolders and Preserve folder structure are on by default. Relative output paths begin at your selected Input Folder.
+Folder batches use one converter process with two parallel workers. Include subfolders and Preserve folder structure are on by default. Output paths preserve the hierarchy below Game/Data root. Selecting Data/Objects/Ships/ANVL/Gear as Input Folder exports into Output/Objects/Ships/ANVL/Gear. The same rule applies to a single input file. Turning preservation off exports directly into Output.
 
 Processor is permanently None. This GUI never imports or executes processor modules and does not read old settings, Profiles, Presets or Modules folders.
 
@@ -73,6 +73,13 @@ def build_command(executable, source, game, output, fmt, types, recursive=True,
         raise ValueError('Output must be a folder.')
     if not 1 <= int(workers) <= 32:
         raise ValueError('Workers must be between 1 and 32.')
+    if preserve:
+        source_dir = inp if inp.is_dir() else inp.parent
+        try:
+            relative_dir = source_dir.relative_to(data)
+        except ValueError:
+            raise ValueError('To preserve folders, the input must be inside Game/Data root. Choose the correct root or turn preservation off.') from None
+        out = out / relative_dir
     cmd = [str(exe)]
     if inp.is_dir():
         cmd += ['-folder', str(inp), '-types', types]
@@ -158,7 +165,7 @@ class App(tk.Tk):
         checks.grid(row=1, column=0, columnspan=4, sticky='w', pady=(12, 0))
         for text, var, helptext in [
             ('Include subfolders', self.recursive, 'On by default. Process nested folders.'),
-            ('Preserve folder structure', self.preserve, 'On by default. Output paths are relative to Input Folder.'),
+            ('Preserve Game/Data folders', self.preserve, 'On by default. Keep the input hierarchy below Game/Data root, including Objects and its subfolders.'),
             ('Include animations', self.animations, 'Load external animation clips using the native converter. Off for normal exports.'),
             ('Unsplit DDS textures', self.unsplit, 'Combine split DDS textures. Optional; off by default.')]:
             w = ttk.Checkbutton(checks, text=text, variable=var)
@@ -283,6 +290,7 @@ class App(tk.Tk):
             missing = sorted(required - flags)
             if missing:
                 raise RuntimeError('Selected converter does not support: ' + ', '.join(missing) + '. Select Windows/cgf-converter.exe from the updated native batch package. StarFab v1.6 is incompatible with these options.')
+            self.events.put(('log', 'OUTPUT BASE: ' + cmd[cmd.index('-out') + 1]))
             self.events.put(('log', subprocess.list2cmdline(cmd)))
             self.events.put(('status', 'Exporting with the native converter… Processor: None'))
             with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1, cwd=cwd, **hidden_process_kwargs()) as proc:
