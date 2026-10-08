@@ -14,7 +14,7 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-TITLE = 'SC CGF Converter 0.4.3 â€” Batch Export'
+TITLE = 'SC CGF Converter 0.4.3 — Batch Export'
 ROOT = Path(__file__).resolve().parent
 PATH_SETTINGS = ROOT / 'SC_CGF_Converter_Folders.json'
 FORMATS = {'USDA': '-usd', 'DAE (legacy)': '-dae', 'GLTF': '-gltf', 'GLB': '-glb'}
@@ -295,14 +295,14 @@ class App(tk.Tk):
         self.unsplit = tk.BooleanVar(value=False)
         self.verbose = tk.BooleanVar(value=False)
         self.workers = tk.IntVar(value=2)
-        self.status = tk.StringVar(value='Ready â€” Processor: None')
+        self.status = tk.StringVar(value='Ready — Processor: None')
         self.activity = tk.StringVar(value='Idle')
         self.destination = tk.StringVar(value='Export destination: choose input, Game/Data root and output.')
         self.converter_info = tk.StringVar(value='Converter not checked')
         frame = ttk.Frame(self, padding=12)
         frame.pack(fill='both', expand=True)
         frame.columnconfigure(1, weight=1)
-        ttk.Label(frame, text='SC CGF Converter 0.4.3 â€” Batch Export', font=('Segoe UI', 12, 'bold')).grid(row=0, column=0, columnspan=3, sticky='w', pady=(0, 8))
+        ttk.Label(frame, text='SC CGF Converter 0.4.3 — Batch Export', font=('Segoe UI', 12, 'bold')).grid(row=0, column=0, columnspan=3, sticky='w', pady=(0, 8))
         self.row(frame, 1, 'Converter EXE', self.exe, [('Browse', self.pick_exe, 'Choose the updated native cgf-converter.exe.'), ('Check Converter', self.check_converter, 'Show the version and usage of the selected executable.')])
         ttk.Label(frame, textvariable=self.converter_info).grid(row=2, column=1, columnspan=2, sticky='w', pady=(0, 6))
         self.row(frame, 3, 'Input asset / folder', self.source, [('Input File', self.pick_file, 'Export one asset.'), ('Input Folder', lambda: self.pick_folder(self.source), 'Export a folder in one native batch process.')])
@@ -316,8 +316,8 @@ class App(tk.Tk):
         game_combo.set('StarCitizen')
         game_combo.grid(row=0, column=1, sticky='w', padx=8)
         ttk.Label(options, text='Processor').grid(row=0, column=2, sticky='w', padx=(12, 0))
-        proc_combo = ttk.Combobox(options, values=['<None> â€” converter only'], state='readonly', width=35)
-        proc_combo.set('<None> â€” converter only')
+        proc_combo = ttk.Combobox(options, values=['<None> — converter only'], state='readonly', width=35)
+        proc_combo.set('<None> — converter only')
         proc_combo.grid(row=0, column=3, sticky='w', padx=8)
         Tooltip(proc_combo, 'No processor modules run. Folder preservation and animation options belong to the native converter.')
         ttk.Label(options, text='Format').grid(row=1, column=0, sticky='w', pady=(8, 0))
@@ -360,7 +360,7 @@ class App(tk.Tk):
         self.progress.grid(row=11, column=0, columnspan=3, sticky='ew', pady=(0, 5))
         self.command = tk.Text(frame, height=2, wrap='word', state='disabled', font=('Consolas', 9))
         self.command.grid(row=12, column=0, columnspan=3, sticky='ew')
-        listener = ttk.LabelFrame(frame, text='Listener â€” live converter output', padding=5)
+        listener = ttk.LabelFrame(frame, text='Listener — live converter output', padding=5)
         listener.grid(row=13, column=0, columnspan=3, sticky='nsew', pady=(8, 0))
         listener.columnconfigure(0, weight=1)
         listener.rowconfigure(0, weight=1)
@@ -421,7 +421,7 @@ class App(tk.Tk):
         p = filedialog.askopenfilename(title='Select native cgf-converter.exe', initialdir=dialog_folder(self.exe.get()), filetypes=[('Converter', '*.exe'), ('All files', '*.*')])
         if p:
             self.exe.set(p)
-            self.converter_info.set('Converter path changed â€” click Check Converter')
+            self.converter_info.set('Converter path changed — click Check Converter')
 
     def pick_file(self):
         p = filedialog.askopenfilename(title='Input asset', initialdir=dialog_folder(self.source.get()), filetypes=[('CryEngine assets', '*.cgf *.cga *.chr *.skin *.anim *.dba'), ('All files', '*.*')])
@@ -450,7 +450,7 @@ class App(tk.Tk):
 
     def help(self):
         popup = tk.Toplevel(self)
-        popup.title('Help â€” CGF Converter')
+        popup.title('Help — CGF Converter')
         popup.geometry('760x600')
         text = tk.Text(popup, wrap='word', padx=14, pady=14)
         text.pack(side='left', fill='both', expand=True)
@@ -538,7 +538,7 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showwarning(TITLE, str(e))
             return
-        self.begin_job('Checking converterâ€¦ Processor: None')
+        self.begin_job('Checking converter… Processor: None')
         self.append_log('EXPORT START: ' + subprocess.list2cmdline(cmd))
         threading.Thread(target=self.work, args=(cmd, cwd), daemon=True).start()
 
@@ -563,7 +563,7 @@ class App(tk.Tk):
         if not Path(exe).is_file():
             messagebox.showwarning(TITLE, 'Select an existing converter executable first.')
             return
-        self.begin_job('Checking converter version and usageâ€¦')
+        self.begin_job('Checking converter version and usage…')
         def check():
             try:
                 self.probe(exe)
@@ -602,7 +602,7 @@ class App(tk.Tk):
             self.events.put(('plan', len(plan)))
             self.events.put(('log', 'EXPECTED FIRST EXPORT: ' + str(plan[0][1])))
             self.events.put(('log', 'OUTPUT BASE: ' + cmd[cmd.index('-out') + 1]))
-            self.events.put(('status', 'Exporting with native converter â€” Processor: None'))
+            self.events.put(('status', 'Exporting with native converter — Processor: None'))
             with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1, cwd=cwd, **hidden_process_kwargs()) as proc:
                 with self.process_lock:
                     self.process = proc
@@ -626,7 +626,7 @@ class App(tk.Tk):
             verify_exports(native_plan, native_before)
             finalize_export_names(native_plan, plan, lambda text: self.events.put(('log', text)))
             count = verify_exports(plan, before)
-            self.events.put(('done', f'Completed â€” verified {count} asset(s) in their required folders'))
+            self.events.put(('done', f'Completed — verified {count} asset(s) in their required folders'))
         except Exception as e:
             self.events.put(('cancelled' if self.cancel_event.is_set() else 'error', str(e)))
         finally:
@@ -638,7 +638,7 @@ class App(tk.Tk):
             return
         self.cancel_event.set()
         self.stop_button.configure(state='disabled')
-        self.status.set('Stopping converterâ€¦')
+        self.status.set('Stopping converter…')
         self.append_log('STOP REQUESTED')
         with self.process_lock:
             if self.process is not None and self.process.poll() is None:
