@@ -1,9 +1,10 @@
 """Portable, single-file native CGF Converter GUI. Python 3 + Tkinter required.
-No processors, profiles, external presets, settings, or companion Python files.
+No processors, profiles, external presets or companion Python files. Folder preferences are saved beside this script.
 Select the updated native cgf-converter.exe; its -folder and -out flags are used.
 """
 from pathlib import Path
 import os
+import json
 import queue
 import re
 import subprocess
@@ -13,8 +14,9 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-TITLE = 'SC CGF Converter 0.4.0 — Batch Export'
+TITLE = 'SC CGF Converter 0.4.3 â€” Batch Export'
 ROOT = Path(__file__).resolve().parent
+PATH_SETTINGS = ROOT / 'SC_CGF_Converter_Folders.json'
 FORMATS = {'USDA': '-usd', 'DAE (legacy)': '-dae', 'GLTF': '-gltf', 'GLB': '-glb'}
 FILTERS = {
     'Normal batch (.cgf, .cga, .skin, .chr)': 'cgf,cga,skin,chr',
@@ -39,9 +41,11 @@ File filter selects which extensions to attempt in a folder. The animated filter
 
 Unsplit DDS textures is optional and off by default. Enable it if you need split DDS files combined. It can add processing work.
 
-The Export destination line shows the required folder before you run. Each primary export is checked in that folder after conversion; missing or unchanged files are reported as failures. The Listener is visible by default and shows timestamped live output, per-file timings and a heartbeat if the converter is silent. Running exports show elapsed time and time since the last converter output. Stop terminates this GUI's converter process. Completed exports show a full 100% progress bar. Detailed logging is optional and off by default. A successful exit alone does not validate the model in 3ds Max.
+The Export destination line shows the required folder before you run. Each primary export is checked in that folder after conversion; missing or unchanged files are reported as failures. Matching CHR/SKIN asset names receive type suffixes (for example argo_atls_chr.usda and argo_atls_skin.usda); unique names stay unchanged. The Listener is visible by default and shows timestamped live output, per-file timings and a heartbeat if the converter is silent. Running exports show elapsed time and time since the last converter output. Stop terminates this GUI's converter process. Completed exports show a full 100% progress bar. Detailed logging is optional and off by default. A successful exit alone does not validate the model in 3ds Max.
 
-Output name collisions are rejected by the native converter. Use a narrower input folder/filter if two assets would produce the same output name.
+When a .cga and .cgf would export to the same filename, CGA keeps the base name and only CGF receives _cgf (for example optic.usda and optic_cgf.usda). Unique CGF names are unchanged. The GUI first verifies native collision-safe output and then publishes the CGA primary under its base name. Referenced companion files keep their native names. Other collision types retain deterministic type/number suffixes. Use the converter EXE included with this package; the old strict-name build rejects conflicts.
+
+Converter, input, Game/Data and output paths are remembered between sessions in SC_CGF_Converter_Folders.json beside the script. Each dialog starts in its own last-used folder; Save Log remembers its folder too. Cancelling a dialog leaves the saved selection unchanged.
 
 Check Converter displays the actual selected executable version and supported options. Preview Command shows the exact job without running it. Copy Report copies the listener. Save Log writes a text file you choose.
 
@@ -105,8 +109,8 @@ def build_command(executable, source, game, output, fmt, types, recursive=True,
     return cmd
 
 
-def export_plan(command):
-    """Expected primary exports, derived from the exact converter command."""
+def export_plan(command, *, native_names=False):
+    """Expected exports. Native names are verified before applying GUI naming policy."""
     output = Path(command[command.index('-out') + 1])
     extensions = {'USDA': '.usda', 'DAE (legacy)': '.dae', 'GLTF': '.gltf', 'GLB': '.glb'}
     extension = next(extensions[name] for name, flag in FORMATS.items() if flag in command)
@@ -129,17 +133,38 @@ def export_plan(command):
                 break
     if not inputs:
         raise ValueError('No matching input assets were found.')
-    plan = []
-    seen = set()
-    for source in sorted(inputs):
+    groups = {}
+    for source in sorted(inputs, key=lambda p: (str(p).upper(), str(p))):
         relative = source.relative_to(root) if '-folder' in command and '-flat' not in command else Path(source.name)
         destination = output / relative.with_suffix(extension)
-        key = str(destination).casefold()
-        if key in seen:
-            raise ValueError('Two inputs would overwrite the same export: ' + str(destination))
-        seen.add(key)
-        plan.append((source, destination))
-    return plan
+        groups.setdefault(str(destination).casefold(), []).append((source, destination))
+    # Only an exact CGA/CGF output pair gives the CGA the unsuffixed name.
+    # Other collisions keep the native deterministic type/number suffix policy.
+    cga_names = {}
+    if not native_names:
+        for group in groups.values():
+            if len(group) == 2 and {src.suffix.lower() for src, _ in group} == {'.cga', '.cgf'}:
+                for source, destination in group:
+                    if source.suffix.lower() == '.cga':
+                        cga_names[source] = destination
+    used = {key for key, group in groups.items() if len(group) == 1}
+    plan = []
+    for group in groups.values():
+        if len(group) == 1:
+            plan.extend(group)
+            continue
+        if '-strictnames' in command:
+            raise ValueError('Two inputs would overwrite the same export: ' + str(group[0][1]))
+        for source, destination in group:
+            basis = source.stem + '_' + source.suffix[1:].lower()
+            candidate = destination.with_name(basis + extension)
+            number = 2
+            while str(candidate).casefold() in used:
+                candidate = destination.with_name(basis + '_' + str(number) + extension)
+                number += 1
+            used.add(str(candidate).casefold())
+            plan.append((source, candidate))
+    return [(source, cga_names.get(source, destination)) for source, destination in plan]
 
 
 def file_stamp(path):
@@ -156,6 +181,62 @@ def verify_exports(plan, before):
         preview = '\n'.join(str(path) for path in missing[:4])
         raise RuntimeError(f'{len(missing)} expected export(s) were not updated in their required folder:\n{preview}\nThe batch was not marked successful. See the Listener for the converter command and output path.')
     return len(plan)
+
+
+def finalize_export_names(native_plan, final_plan, log=None):
+    """Publish the CGA primary under its base name after native output verification.
+
+    Companion assets keep the native filenames referenced inside the export.
+    Inputs and decoded content are never renamed or rewritten.
+    """
+    native_by_source = dict(native_plan)
+    if len(native_by_source) != len(final_plan) or set(native_by_source) != {src for src, _ in final_plan}:
+        raise RuntimeError('Native and final export plans do not contain the same inputs.')
+    targets = [str(dest).casefold() for _, dest in final_plan]
+    if len(targets) != len(set(targets)):
+        raise RuntimeError('Final output names are not unique.')
+    moves = [(source, native_by_source[source], dest) for source, dest in final_plan
+             if native_by_source[source] != dest]
+    # Check the entire publication plan before renaming any primary export.
+    native_targets = {str(dest).casefold() for _, dest in native_plan}
+    for source, original, dest in moves:
+        if source.suffix.lower() != '.cga' or file_stamp(original) is None:
+            raise RuntimeError('Missing verified CGA export: ' + str(original))
+        if str(dest).casefold() in native_targets:
+            raise RuntimeError('CGA base name would replace another native export: ' + str(dest))
+    for source, original, dest in moves:
+        original.replace(dest)
+        if log is not None:
+            log('CGA/CGF CONFLICT: CGA keeps ' + str(dest) + '; CGF receives _cgf. Companion names are retained.')
+
+
+def load_folder_preferences(path=PATH_SETTINGS):
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(data, dict):
+            return {}
+        return {key: value for key, value in data.items()
+                if key in ('exe', 'source', 'game', 'output', 'log') and isinstance(value, str)}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_folder_preferences(data, path=PATH_SETTINGS):
+    temporary = path.with_suffix('.json.tmp')
+    temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
+    temporary.replace(path)
+
+
+def dialog_folder(value):
+    # Use a valid ancestor if a drive/folder saved on another machine is absent.
+    if value:
+        candidate = Path(value).expanduser()
+        while not candidate.is_dir():
+            if candidate.parent == candidate:
+                return str(ROOT)
+            candidate = candidate.parent
+        return str(candidate)
+    return str(ROOT)
 
 
 class Tooltip:
@@ -199,10 +280,13 @@ class App(tk.Tk):
         self.completed = 0
         self.total = 0
         self.report_lines = []
-        self.exe = tk.StringVar(value=self.find_converter())
-        self.source = tk.StringVar()
-        self.game = tk.StringVar()
-        self.output = tk.StringVar()
+        self.folder_preferences = load_folder_preferences()
+        self.folder_save_error = False
+        saved_exe = self.folder_preferences.get('exe', '')
+        self.exe = tk.StringVar(value=saved_exe if saved_exe and Path(saved_exe).is_file() else self.find_converter())
+        self.source = tk.StringVar(value=self.folder_preferences.get('source', ''))
+        self.game = tk.StringVar(value=self.folder_preferences.get('game', ''))
+        self.output = tk.StringVar(value=self.folder_preferences.get('output', ''))
         self.fmt = tk.StringVar(value='USDA')
         self.types = tk.StringVar(value=next(iter(FILTERS)))
         self.recursive = tk.BooleanVar(value=True)
@@ -211,14 +295,14 @@ class App(tk.Tk):
         self.unsplit = tk.BooleanVar(value=False)
         self.verbose = tk.BooleanVar(value=False)
         self.workers = tk.IntVar(value=2)
-        self.status = tk.StringVar(value='Ready — Processor: None')
+        self.status = tk.StringVar(value='Ready â€” Processor: None')
         self.activity = tk.StringVar(value='Idle')
         self.destination = tk.StringVar(value='Export destination: choose input, Game/Data root and output.')
         self.converter_info = tk.StringVar(value='Converter not checked')
         frame = ttk.Frame(self, padding=12)
         frame.pack(fill='both', expand=True)
         frame.columnconfigure(1, weight=1)
-        ttk.Label(frame, text='SC CGF Converter 0.4.0 — Batch Export', font=('Segoe UI', 12, 'bold')).grid(row=0, column=0, columnspan=3, sticky='w', pady=(0, 8))
+        ttk.Label(frame, text='SC CGF Converter 0.4.3 â€” Batch Export', font=('Segoe UI', 12, 'bold')).grid(row=0, column=0, columnspan=3, sticky='w', pady=(0, 8))
         self.row(frame, 1, 'Converter EXE', self.exe, [('Browse', self.pick_exe, 'Choose the updated native cgf-converter.exe.'), ('Check Converter', self.check_converter, 'Show the version and usage of the selected executable.')])
         ttk.Label(frame, textvariable=self.converter_info).grid(row=2, column=1, columnspan=2, sticky='w', pady=(0, 6))
         self.row(frame, 3, 'Input asset / folder', self.source, [('Input File', self.pick_file, 'Export one asset.'), ('Input Folder', lambda: self.pick_folder(self.source), 'Export a folder in one native batch process.')])
@@ -232,8 +316,8 @@ class App(tk.Tk):
         game_combo.set('StarCitizen')
         game_combo.grid(row=0, column=1, sticky='w', padx=8)
         ttk.Label(options, text='Processor').grid(row=0, column=2, sticky='w', padx=(12, 0))
-        proc_combo = ttk.Combobox(options, values=['<None> — converter only'], state='readonly', width=35)
-        proc_combo.set('<None> — converter only')
+        proc_combo = ttk.Combobox(options, values=['<None> â€” converter only'], state='readonly', width=35)
+        proc_combo.set('<None> â€” converter only')
         proc_combo.grid(row=0, column=3, sticky='w', padx=8)
         Tooltip(proc_combo, 'No processor modules run. Folder preservation and animation options belong to the native converter.')
         ttk.Label(options, text='Format').grid(row=1, column=0, sticky='w', pady=(8, 0))
@@ -276,7 +360,7 @@ class App(tk.Tk):
         self.progress.grid(row=11, column=0, columnspan=3, sticky='ew', pady=(0, 5))
         self.command = tk.Text(frame, height=2, wrap='word', state='disabled', font=('Consolas', 9))
         self.command.grid(row=12, column=0, columnspan=3, sticky='ew')
-        listener = ttk.LabelFrame(frame, text='Listener — live converter output', padding=5)
+        listener = ttk.LabelFrame(frame, text='Listener â€” live converter output', padding=5)
         listener.grid(row=13, column=0, columnspan=3, sticky='nsew', pady=(8, 0))
         listener.columnconfigure(0, weight=1)
         listener.rowconfigure(0, weight=1)
@@ -293,6 +377,9 @@ class App(tk.Tk):
         frame.rowconfigure(13, weight=1)
         for var in (self.source, self.game, self.output, self.preserve):
             var.trace_add('write', self.refresh_destination)
+        for var in (self.exe, self.source, self.game, self.output):
+            var.trace_add('write', self.remember_paths)
+        self.refresh_destination()
         self.protocol('WM_DELETE_WINDOW', self.close)
         self.after(100, self.drain)
         self.after(1000, self.tick)
@@ -319,19 +406,30 @@ class App(tk.Tk):
         for text, command, tip in buttons:
             self.button(actions, text, command, tip)
 
+    def remember_paths(self, *args):
+        self.folder_preferences.update(exe=self.exe.get(), source=self.source.get(),
+                                       game=self.game.get(), output=self.output.get())
+        try:
+            save_folder_preferences(self.folder_preferences)
+            self.folder_save_error = False
+        except OSError as error:
+            if not self.folder_save_error:
+                self.append_log('Could not save folder preferences beside the script: ' + str(error))
+                self.folder_save_error = True
+
     def pick_exe(self):
-        p = filedialog.askopenfilename(title='Select native cgf-converter.exe', filetypes=[('Converter', '*.exe'), ('All files', '*.*')])
+        p = filedialog.askopenfilename(title='Select native cgf-converter.exe', initialdir=dialog_folder(self.exe.get()), filetypes=[('Converter', '*.exe'), ('All files', '*.*')])
         if p:
             self.exe.set(p)
-            self.converter_info.set('Converter path changed — click Check Converter')
+            self.converter_info.set('Converter path changed â€” click Check Converter')
 
     def pick_file(self):
-        p = filedialog.askopenfilename(title='Input asset', filetypes=[('CryEngine assets', '*.cgf *.cga *.chr *.skin *.anim *.dba'), ('All files', '*.*')])
+        p = filedialog.askopenfilename(title='Input asset', initialdir=dialog_folder(self.source.get()), filetypes=[('CryEngine assets', '*.cgf *.cga *.chr *.skin *.anim *.dba'), ('All files', '*.*')])
         if p:
             self.source.set(p)
 
     def pick_folder(self, var):
-        p = filedialog.askdirectory(title='Select folder', mustexist=False if var is self.output else True)
+        p = filedialog.askdirectory(title='Select folder', initialdir=dialog_folder(var.get()), mustexist=False if var is self.output else True)
         if p:
             var.set(p)
 
@@ -352,7 +450,7 @@ class App(tk.Tk):
 
     def help(self):
         popup = tk.Toplevel(self)
-        popup.title('Help — CGF Converter')
+        popup.title('Help â€” CGF Converter')
         popup.geometry('760x600')
         text = tk.Text(popup, wrap='word', padx=14, pady=14)
         text.pack(side='left', fill='both', expand=True)
@@ -414,10 +512,12 @@ class App(tk.Tk):
         self.update_idletasks()
 
     def save_log(self):
-        path = filedialog.asksaveasfilename(title='Save listener log', defaultextension='.txt', initialfile='CGF_Converter_Log.txt', filetypes=[('Text', '*.txt')])
+        path = filedialog.asksaveasfilename(title='Save listener log', initialdir=dialog_folder(self.folder_preferences.get('log', self.output.get())), defaultextension='.txt', initialfile='CGF_Converter_Log.txt', filetypes=[('Text', '*.txt')])
         if path:
             try:
                 Path(path).write_text('\n'.join(self.report_lines) + '\n', encoding='utf-8')
+                self.folder_preferences['log'] = str(Path(path).parent)
+                self.remember_paths()
             except OSError as e:
                 messagebox.showerror(TITLE, str(e))
 
@@ -438,7 +538,7 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showwarning(TITLE, str(e))
             return
-        self.begin_job('Checking converter… Processor: None')
+        self.begin_job('Checking converterâ€¦ Processor: None')
         self.append_log('EXPORT START: ' + subprocess.list2cmdline(cmd))
         threading.Thread(target=self.work, args=(cmd, cwd), daemon=True).start()
 
@@ -463,7 +563,7 @@ class App(tk.Tk):
         if not Path(exe).is_file():
             messagebox.showwarning(TITLE, 'Select an existing converter executable first.')
             return
-        self.begin_job('Checking converter version and usage…')
+        self.begin_job('Checking converter version and usageâ€¦')
         def check():
             try:
                 self.probe(exe)
@@ -491,11 +591,18 @@ class App(tk.Tk):
             if missing:
                 raise RuntimeError('Selected converter does not support: ' + ', '.join(missing) + '. Select Windows/cgf-converter.exe from the native batch package. StarFab v1.6 is incompatible with these options.')
             plan = export_plan(cmd)
+            native_plan = export_plan(cmd, native_names=True)
+            renamed = [(source, dest) for source, dest in native_plan if source.stem != dest.stem]
+            if renamed and '-strictnames' not in flags:
+                raise RuntimeError('This batch needs the updated collision-safe converter. Select Windows/cgf-converter.exe from the new package; the older converter stops on matching .chr/.skin names.')
+            for source, dest in renamed:
+                self.events.put(('log', 'COLLISION NAME: ' + str(source) + ' -> ' + str(dest)))
             before = {str(dest): file_stamp(dest) for _, dest in plan}
+            native_before = {str(dest): file_stamp(dest) for _, dest in native_plan}
             self.events.put(('plan', len(plan)))
             self.events.put(('log', 'EXPECTED FIRST EXPORT: ' + str(plan[0][1])))
             self.events.put(('log', 'OUTPUT BASE: ' + cmd[cmd.index('-out') + 1]))
-            self.events.put(('status', 'Exporting with native converter — Processor: None'))
+            self.events.put(('status', 'Exporting with native converter â€” Processor: None'))
             with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', bufsize=1, cwd=cwd, **hidden_process_kwargs()) as proc:
                 with self.process_lock:
                     self.process = proc
@@ -516,8 +623,10 @@ class App(tk.Tk):
                 return
             if code:
                 raise RuntimeError(f'Converter returned {code}. See the Listener for its errors.')
+            verify_exports(native_plan, native_before)
+            finalize_export_names(native_plan, plan, lambda text: self.events.put(('log', text)))
             count = verify_exports(plan, before)
-            self.events.put(('done', f'Completed — verified {count} asset(s) in their required folders'))
+            self.events.put(('done', f'Completed â€” verified {count} asset(s) in their required folders'))
         except Exception as e:
             self.events.put(('cancelled' if self.cancel_event.is_set() else 'error', str(e)))
         finally:
@@ -529,7 +638,7 @@ class App(tk.Tk):
             return
         self.cancel_event.set()
         self.stop_button.configure(state='disabled')
-        self.status.set('Stopping converter…')
+        self.status.set('Stopping converterâ€¦')
         self.append_log('STOP REQUESTED')
         with self.process_lock:
             if self.process is not None and self.process.poll() is None:
